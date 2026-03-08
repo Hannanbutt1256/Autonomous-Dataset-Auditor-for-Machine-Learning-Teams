@@ -6,12 +6,20 @@ import json
 import re
 import ast
 import codecs
-
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(
     title="Autonomous Dataset Auditor API",
     description="API for triggering multi-agent dataset audits",
     version="0.1.0",
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 @app.get("/health")
@@ -50,13 +58,42 @@ def trigger_audit(request: AuditRequest):
 
         raw_text = result.raw
         
+        def repair_json(text):
+            """
+            Attempts to repair a truncated JSON string by adding missing closing braces/brackets.
+            """
+            text = text.strip()
+            stack = []
+            in_string = False
+            escape = False
+            
+            for i, char in enumerate(text):
+                if char == '"' and not escape:
+                    in_string = not in_string
+                if in_string:
+                    if char == '\\':
+                        escape = not escape
+                    else:
+                        escape = False
+                    continue
+                
+                if char == '{':
+                    stack.append('}')
+                elif char == '[':
+                    stack.append(']')
+                elif char in ('}', ']') and stack:
+                    if stack[-1] == char:
+                        stack.pop()
+            
+            # Close any remaining open constructs
+            return text + "".join(reversed(stack))
+
         # Strategy 1: Strip ```json ... ``` markdown code block if present
         json_match = re.search(r'```json\s*(.*?)\s*```', raw_text, re.DOTALL)
         if json_match:
             raw_text = json_match.group(1).strip()
 
         # Strategy 2: Extract the outermost JSON object from the raw text
-        # This handles cases where the LLM adds extra text before/after the JSON
         obj_match = re.search(r'\{.*\}', raw_text, re.DOTALL)
         if obj_match:
             raw_text = obj_match.group(0).strip()
@@ -69,16 +106,32 @@ def trigger_audit(request: AuditRequest):
         except json.JSONDecodeError:
             pass
 
-        # Strategy 4: Fix double-escaped sequences (\\n -> \n) then retry
+        # Strategy 4: Try to REPAIR then load
         if data is None:
             try:
-                # The LLM often double-escapes newlines in code blocks: \\n instead of \n
+                repaired_text = repair_json(raw_text)
+                data = json.loads(repaired_text)
+            except json.JSONDecodeError:
+                pass
+
+        # Strategy 5: Fix double-escaped sequences (\\n -> \n) then retry
+        if data is None:
+            try:
                 fixed_text = raw_text.encode('utf-8').decode('unicode_escape')
                 data = json.loads(fixed_text)
             except (json.JSONDecodeError, UnicodeDecodeError):
                 pass
+        
+        # Strategy 6: Try to fix truncated and escaped
+        if data is None:
+            try:
+                fixed_text = raw_text.encode('utf-8').decode('unicode_escape')
+                repaired_text = repair_json(fixed_text)
+                data = json.loads(repaired_text)
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                pass
 
-        # Strategy 5: Try ast.literal_eval as a last resort
+        # Strategy 7: Try ast.literal_eval as a last resort
         if data is None:
             try:
                 data = ast.literal_eval(raw_text)
@@ -87,7 +140,7 @@ def trigger_audit(request: AuditRequest):
 
         # If all strategies fail, return a failure response with the raw text as human_report
         if data is None:
-            print("All parsing strategies failed. Raw output:", raw_text)
+            print(f"FAILED TO PARSE JSON. RAW OUTPUT START: {raw_text[:500]}...")
             return AuditResponse(
                 status="failed",
                 dataset_url=request.dataset_url,

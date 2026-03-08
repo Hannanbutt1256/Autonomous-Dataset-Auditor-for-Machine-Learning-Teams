@@ -136,7 +136,7 @@ OPENAI_API_KEY=your_openai_api_key_here
 
 ```bash
 docker build -t dataset-auditor .
-docker run -p 8000:8000 --env-file .env dataset-auditor
+docker run -p 8000:8000 -e OPENAI_API_KEY=your_key_here dataset-auditor
 ```
 
 ### 3. Run Locally (without Docker)

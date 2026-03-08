@@ -7,7 +7,9 @@ def schema_audit_task(agent, dataset_url):
     return Task(
         description=f"""
         Analyze the dataset located at: {dataset_url}.
-        The dataset may be in CSV or Excel format.
+        
+        CRITICAL: Use the 'read_dataset_content' tool to fetch the dataset summary and head rows.
+        Do NOT guess the structure. Use the actual data from the tool.
 
         Perform the following analysis:
 
@@ -509,49 +511,42 @@ def create_pipeline_code_generator_task(agent, dataset_url, target_column=None):
 
 #Task 9
 def generate_audit_report_task(agent):
-
     return Task(
         description="""
-        Generate a comprehensive dataset audit report by combining the
-        results from previous agents in the pipeline:
-
-        1. Schema & Context Analysis
-        2. Bias and Fairness Audit
-        3. Data Leakage Detection
-        4. Data Quality Audit
-        5. Feature Readiness Evaluation
-        6. Preprocessing Planning
-        7. Model Compatibility Analysis
-        8. Pipeline Code Generation
-
-        Your task is to organize these findings into a structured report
-        suitable for ML teams.
-
-        The report should clearly summarize:
-        - Dataset overview
-        - Schema insights
-        - Bias and fairness risks
-        - Leakage risks
-        - Overall dataset readiness
-        - Recommended actions before model training
+        Generate a comprehensive dataset audit report by consolidating the 
+        findings from all previous agents.
+        
+        CRITICAL: 
+        1. Be CONCISE. Do not repeat long lists or full tables from previous tasks.
+        2. Focus on high-level insights and critical warnings.
+        3. Ensure the JSON is valid and strictly follows the schema.
+        4. If the report is getting too long, prioritize 'summary', 'recommendations', and 'pipeline_code'.
         """,
 
         expected_output="""
-        A structured JSON Dataset Audit Report strictly adhering to the Pydantic schema provided.
+        A structured JSON Dataset Audit Report.
         
-        Ensure you populate:
-        - summary: A DatasetSummary object (dataset_name, rows, columns, domain, ml_readiness, bias_risk, leakage_risk, data_quality_risk, feature_readiness_risk, preprocessing_plan_risk, model_compatibility_risk, pipeline_code_risk).
-        - schema_analysis: A detailed dictionary of schema findings.
-        - bias_analysis: A detailed dictionary of bias/fairness warnings.
-        - leakage_analysis: A detailed dictionary of target leakage risks.
-        - recommendations: A list of actionable string recommendations.
-        - data_quality_analysis: A detailed dictionary of data quality findings.
-        - feature_readiness_analysis: A detailed dictionary of feature readiness findings.
-        - preprocessing_plan: A detailed dictionary of preprocessing plan findings.
-        - model_compatibility_analysis: A detailed dictionary of model compatibility findings.
-        - pipeline_code: A detailed string containing the generated python pipeline code.
-        - human_report: A comprehensive Markdown string of the full report.
+        Required fields:
+        - summary: 
+            - dataset_name: name of dataset
+            - total_rows: integer count of rows
+            - total_columns: integer count of columns
+            - domain: domain of dataset
+            - target_variable: name of the target column
+            - ml_readiness: percentage string (e.g. "85%")
+            - bias_risk: enum (HIGH, MEDIUM, LOW, NONE)
+            - leakage_risk: enum (HIGH, MEDIUM, LOW, NONE)
+            - data_quality_risk: enum (HIGH, MEDIUM, LOW, NONE)
+        - schema_analysis: { "column_schema": { "col_name": {"type": "type", "missing_values_percent": 0.0, "unique_values": 0} } }
+        - bias_analysis: { "sensitive_attributes": ["attr1", ...], "high_risk_groups": [...], "class_imbalance": "description" }
+        - leakage_analysis: { "high_risk_columns": [...], "recommendations": "..." }
+        - recommendations: List of top 5-10 actionable steps (List[str]).
+        - data_quality_analysis: Key quality issues (Dict).
+        - preprocessing_plan: { "missing_values": "...", "outliers": "...", "skewness": "..." }
+        - feature_readiness_analysis: { "encoding": "...", "scaling": "...", "importance": "..." }
+        - model_compatibility_analysis: { "recommended_models": ["model1", ...] }
+        - pipeline_code: Executable Python code (String).
+        - human_report: A concise Markdown summary (String).
         """,
-        # output_pydantic=AuditResponse,
         agent=agent
     )

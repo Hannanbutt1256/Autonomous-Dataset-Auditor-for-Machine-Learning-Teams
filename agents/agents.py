@@ -11,6 +11,8 @@ load_dotenv()
 #     temperature=0.7,
 #     verbose=True
 # )
+from agents.tools import read_dataset_content
+
 llm = LLM(
     model="gpt-4o-mini",
     api_key=os.getenv("OPENAI_API_KEY"),
@@ -29,188 +31,92 @@ def create_schema_agent():
 
         Your job is to quickly understand unfamiliar datasets by examining
         their structure, column names, value patterns, and statistics.
-
-        You are highly skilled at:
-        - Identifying dataset domains (finance, healthcare, marketing, retail, etc.)
-        - Inferring column data types
-        - Detecting schema inconsistencies
-        - Finding missing values and anomalies
-        - Recognizing identifiers and categorical variables
-        - Determining which columns are features, targets, or metadata
-
-        Your analysis is used by downstream AI agents responsible for
-        data quality validation, statistical analysis, and ML readiness.
         """,
+        tools=[read_dataset_content],
         llm=llm,
         verbose=True,
         allow_delegation=False
     )
+
 # Agent 2
-
 def create_bias_auditor_agent():
-
     return Agent(
         role="Dataset Bias and Fairness Auditor",
-
-        goal="""
-        Evaluate datasets for potential bias, class imbalance,
-        and fairness risks that could negatively impact machine
-        learning models.
-        """,
-
-        backstory="""
-        You are an expert in responsible AI and machine learning fairness.
-
-        Your role is to carefully inspect datasets for signs of bias,
-        imbalanced class distributions, and underrepresented groups that
-        could lead to unfair or unreliable machine learning models.
-
-        You specialize in identifying:
-        - Target class imbalance
-        - Demographic representation imbalance
-        - Sensitive attributes (gender, race, age, etc.)
-        - Dataset sampling issues
-        - Potential fairness risks in predictive models
-
-        Your analysis helps ML teams build fair and trustworthy AI systems.
-        """,
-
+        goal="Evaluate datasets for potential bias, class imbalance, and fairness risks.",
+        backstory="Expert in responsible AI and ML fairness.",
+        tools=[read_dataset_content],
         llm=llm,
-
         verbose=True,
-
         allow_delegation=False
     )
+
 # Agent 3
-
 def create_leakage_hunter_agent():
-
     return Agent(
         role="Target Leakage Detection Specialist",
-
-        goal="""
-        Identify features that may leak information about the target
-        variable and compromise machine learning model validity.
-        Detect direct, indirect, temporal, and proxy leakage risks.
-        """,
-
-        backstory="""
-        You are a senior machine learning auditor specializing in
-        detecting subtle forms of data leakage in structured datasets.
-
-        You understand that leakage can appear in many forms:
-        - Columns derived from the target
-        - Post-outcome variables
-        - Data collected after prediction time
-        - Proxy variables highly correlated with the target
-        - Unique identifiers that encode outcome information
-        - Improper train-test split contamination
-
-        Your mission is to protect ML teams from building
-        over-optimistic, invalid models caused by hidden leakage.
-        """,
-
+        goal="Identify features that may leak information about the target variable.",
+        backstory="Senior ML auditor specializing in detecting subtle data leakage.",
+        tools=[read_dataset_content],
         llm=llm,
         verbose=True,
         allow_delegation=False
     )
 
-#Agent 4
+# Agent 4
 def create_data_quality_agent():
     return Agent(
         role="Data Quality Auditor",
-        goal=(
-            "Perform a comprehensive data quality audit of the dataset and detect issues that could negatively affect "
-            "machine learning models."
-        ),
-        backstory=(
-            "You are a senior data quality engineer with extensive experience preparing datasets for machine learning. "
-            "Your responsibility is to carefully analyze datasets to detect duplicates, missing values, extreme outliers, "
-            "skewed distributions, inconsistent formatting, invalid entries, and other anomalies. "
-            "You produce structured findings that help downstream agents design preprocessing pipelines and improve "
-            "dataset reliability before training ML models."
-        ),
+        goal="Perform a comprehensive data quality audit of the dataset.",
+        backstory="Senior data quality engineer specializing in dataset anomalies.",
+        tools=[read_dataset_content],
         llm=llm,
         verbose=True,
         allow_delegation=False
     )
-#Agent 5
+
+# Agent 5
 def create_feature_readiness_agent():
     return Agent(
         role="Machine Learning Feature Readiness Analyst",
-        goal=(
-            "Evaluate dataset features to determine their suitability for machine learning models "
-            "and identify problematic, redundant, or non-informative features."
-        ),
-        backstory=(
-            "You are a senior machine learning feature engineer specializing in feature evaluation and "
-            "data preparation for predictive modeling. You analyze dataset columns to determine whether "
-            "they provide meaningful information for machine learning models. You detect identifier fields, "
-            "constant columns, high-cardinality categorical variables, redundant or highly correlated features, "
-            "and features that may introduce noise or instability in model training. Your analysis helps "
-            "machine learning engineers decide which features to keep, transform, encode, or remove before "
-            "model training."
-        ),
+        goal="Evaluate dataset features for ML suitability.",
+        backstory="Senior ML feature engineer.",
+        tools=[read_dataset_content],
         llm=llm,
         verbose=True,
         allow_delegation=False
     )
-#Agent 6
+
+# Agent 6
 def create_preprocessing_planner_agent():
     return Agent(
         role="Machine Learning Preprocessing Strategist",
-        goal=(
-            "Design a complete and effective data preprocessing strategy that prepares the dataset "
-            "for machine learning model training."
-        ),
-        backstory=(
-            "You are a senior machine learning pipeline architect responsible for preparing datasets "
-            "for predictive modeling. You analyze findings from schema analysis, data quality audits, "
-            "bias analysis, leakage detection, and feature readiness evaluation to design a robust "
-            "data preprocessing strategy. Your job is to recommend clear, structured steps for "
-            "cleaning, transforming, and preparing data so that it can be safely used in machine "
-            "learning pipelines."
-        ),
+        goal="Design a complete and effective data preprocessing strategy.",
+        backstory="Senior ML pipeline architect.",
+        tools=[read_dataset_content],
         llm=llm,
         verbose=True,
         allow_delegation=False
     )
-#Agent 7
+
+# Agent 7
 def create_model_compatibility_agent():
     return Agent(
         role="Machine Learning Model Compatibility Advisor",
-        goal=(
-            "Analyze the dataset characteristics and recommend the most suitable machine learning "
-            "models for training."
-        ),
-        backstory=(
-            "You are a senior machine learning scientist with deep expertise in selecting optimal "
-            "algorithms for different types of datasets. By analyzing dataset properties such as "
-            "target variable type, feature structure, dataset size, feature distributions, and "
-            "class imbalance, you determine which machine learning models are most appropriate. "
-            "Your recommendations help ML engineers quickly identify suitable algorithms and avoid "
-            "models that are incompatible with the dataset characteristics."
-        ),
+        goal="Recommend the most suitable ML models for training.",
+        backstory="Senior ML scientist with expertise in algorithm selection.",
+        tools=[read_dataset_content],
         llm=llm,
         verbose=True,
         allow_delegation=False
     )
-#Agent 8
+
+# Agent 8
 def create_pipeline_code_generator_agent():
     return Agent(
         role="Machine Learning Pipeline Code Generator",
-        goal=(
-            "Generate a complete and executable Python data preprocessing pipeline based on the findings "
-            "and recommendations from all dataset auditing agents."
-        ),
-        backstory=(
-            "You are a senior machine learning engineer responsible for transforming dataset audit findings "
-            "into fully functional preprocessing pipelines. Using insights from schema analysis, data quality "
-            "reports, bias audits, leakage detection, feature readiness evaluation, and preprocessing planning, "
-            "you generate clean, production-ready Python code. Your pipelines use pandas and scikit-learn to "
-            "implement best practices such as handling missing values, encoding categorical features, scaling "
-            "numerical features, removing problematic columns, and preparing data for machine learning models."
-        ),
+        goal="Generate a complete and executable Python preprocessing pipeline.",
+        backstory="Senior ML engineer responsible for functional pipelines.",
+        tools=[read_dataset_content],
         llm=llm,
         verbose=True,
         allow_delegation=False
