@@ -7,6 +7,7 @@ import re
 import ast
 import codecs
 from fastapi.middleware.cors import CORSMiddleware
+from supabase import create_client, Client
 
 app = FastAPI(
     title="Autonomous Dataset Auditor API",
@@ -21,6 +22,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Supabase Initialization
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") # Use Service Role Key for backend writes
+
+supabase: Client = None
+if SUPABASE_URL and SUPABASE_KEY:
+    try:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    except Exception as e:
+        print(f"Failed to initialize Supabase: {e}")
 
 @app.get("/health")
 def health_check():
@@ -160,6 +172,17 @@ def trigger_audit(request: AuditRequest):
             # Try to format the dict nicely into a markdown block instead of crashing
             human_report_content = json.dumps(human_report_content, indent=2)
 
+        # If job_id is provided, update Supabase with the successful result
+        if request.job_id and supabase:
+            try:
+                supabase.table("jobs").update({
+                    "status": "completed",
+                    "result": data,
+                    "updated_at": "now()"
+                }).eq("id", request.job_id).execute()
+            except Exception as e:
+                print(f"Failed to update Supabase job {request.job_id}: {e}")
+
         return AuditResponse(
             status="completed",
             dataset_url=request.dataset_url,
@@ -176,4 +199,15 @@ def trigger_audit(request: AuditRequest):
             human_report=str(human_report_content) if human_report_content else None
         )
     except Exception as e:
+        # If job_id is provided, update Supabase with the failure
+        if request.job_id and supabase:
+            try:
+                supabase.table("jobs").update({
+                    "status": "failed",
+                    "error_message": str(e),
+                    "updated_at": "now()"
+                }).eq("id", request.job_id).execute()
+            except Exception as se:
+                print(f"Failed to update Supabase failure for job {request.job_id}: {se}")
+        
         raise HTTPException(status_code=500, detail=str(e))

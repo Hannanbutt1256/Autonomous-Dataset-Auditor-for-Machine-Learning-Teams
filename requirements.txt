@@ -6,3 +6,4 @@ crewai[anthropic]
 pandas
 requests
 openpyxl
+supabase

@@ -4,6 +4,7 @@ from typing import Optional, Dict, Any, List
 class AuditRequest(BaseModel):
     dataset_url: str
     target_column: Optional[str] = None
+    job_id: Optional[str] = None
 
 class DatasetSummary(BaseModel):
     dataset_name: Optional[str] = None
