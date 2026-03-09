@@ -86,5 +86,7 @@ jobs:
           containerAppName: ${{ secrets.CONTAINER_APP_NAME }}
           resourceGroup: ${{ secrets.RESOURCE_GROUP }}
           imageToDeploy: ${{ env.ACR_LOGIN_SERVER }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          targetPort: 8000
+          ingress: external
           environmentVariables: |
             OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
