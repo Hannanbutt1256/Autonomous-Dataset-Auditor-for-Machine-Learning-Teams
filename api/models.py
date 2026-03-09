@@ -26,6 +26,7 @@ class DatasetSummary(BaseModel):
 class AuditResponse(BaseModel):
     status: str
     dataset_url: str
+    job_id: Optional[str] = None
     summary: Optional[DatasetSummary] = None
     schema_analysis: Optional[Dict[str, Any]] = None
     bias_analysis: Optional[Dict[str, Any]] = None

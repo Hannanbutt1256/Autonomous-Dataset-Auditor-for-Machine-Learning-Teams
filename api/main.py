@@ -1,5 +1,5 @@
 import os
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from api.models import AuditRequest, AuditResponse
 from agents.crew import AuditorCrew
 import json
@@ -38,36 +38,12 @@ if SUPABASE_URL and SUPABASE_KEY:
 def health_check():
     return {"status": "ok"}
 
-@app.post("/api/audit", response_model=AuditResponse)
-def trigger_audit(request: AuditRequest):
+def run_audit_in_background(request: AuditRequest):
     try:
         # Initialize and kickoff the crew
         crew = AuditorCrew(dataset_url=request.dataset_url)
         result = crew.run()
         
-        # CrewAI's pydantic output preserves all model properties
-        # output_model = result.pydantic
-        # 
-        # # If the LLM failed to cast to Pydantic, fallback safely
-        # if not output_model:
-        #     return AuditResponse(
-        #         status="failed",
-        #         dataset_url=request.dataset_url,
-        #         human_report=result.raw
-        #     )
-        #
-        # return AuditResponse(
-        #     status="completed",
-        #     dataset_url=request.dataset_url,
-        #     summary=output_model.summary,
-        #     schema_analysis=output_model.schema_analysis,
-        #     bias_analysis=output_model.bias_analysis,
-        #     leakage_analysis=output_model.leakage_analysis,
-        #     recommendations=output_model.recommendations,
-        #     human_report=output_model.human_report
-        # )
-
-
         raw_text = result.raw
         
         def repair_json(text):
@@ -150,29 +126,28 @@ def trigger_audit(request: AuditRequest):
             except (ValueError, SyntaxError):
                 pass
 
-        # If all strategies fail, return a failure response with the raw text as human_report
+        # If all strategies fail, we'll store the raw text as a failure state in Supabase
         if data is None:
-            print(f"FAILED TO PARSE JSON. RAW OUTPUT START: {raw_text[:500]}...")
-            return AuditResponse(
-                status="failed",
-                dataset_url=request.dataset_url,
-                human_report=f"Failed to parse LLM JSON output. Raw result: {raw_text}"
-            )
+            print(f"FAILED TO PARSE JSON for Job {request.job_id}. RAW OUTPUT START: {raw_text[:500]}...")
+            if request.job_id and supabase:
+                supabase.table("jobs").update({
+                    "status": "failed",
+                    "error_message": f"Failed to parse LLM JSON output. Raw result: {raw_text[:1000]}",
+                    "updated_at": "now()"
+                }).eq("id", request.job_id).execute()
+            return
 
         # Make sure pipeline_code is safely casted to a string to satisfy Pydantic
-        # Sometimes the LLM ignores instructions and outputs a nested dictionary
         pipeline_code_content = data.get("pipeline_code")
         if isinstance(pipeline_code_content, dict):
-            # Extract just the nested value if it gave us {"python_code": "..."}
             pipeline_code_content = list(pipeline_code_content.values())[0] if pipeline_code_content else ""
         
         # Make sure human_report is safely casted to a string
         human_report_content = data.get("human_report")
         if isinstance(human_report_content, dict):
-            # Try to format the dict nicely into a markdown block instead of crashing
             human_report_content = json.dumps(human_report_content, indent=2)
 
-        # If job_id is provided, update Supabase with the successful result
+        # Update Supabase with the final successful result
         if request.job_id and supabase:
             try:
                 supabase.table("jobs").update({
@@ -180,25 +155,12 @@ def trigger_audit(request: AuditRequest):
                     "result": data,
                     "updated_at": "now()"
                 }).eq("id", request.job_id).execute()
+                print(f"Job {request.job_id} successfully updated in Supabase.")
             except Exception as e:
                 print(f"Failed to update Supabase job {request.job_id}: {e}")
 
-        return AuditResponse(
-            status="completed",
-            dataset_url=request.dataset_url,
-            summary=data.get("summary"),
-            schema_analysis=data.get("schema_analysis"),
-            bias_analysis=data.get("bias_analysis"),
-            leakage_analysis=data.get("leakage_analysis"),
-            recommendations=data.get("recommendations"),
-            data_quality_analysis=data.get("data_quality_analysis"),
-            feature_readiness_analysis=data.get("feature_readiness_analysis"),
-            preprocessing_plan=data.get("preprocessing_plan"),
-            model_compatibility_analysis=data.get("model_compatibility_analysis"),
-            pipeline_code=str(pipeline_code_content) if pipeline_code_content else None,
-            human_report=str(human_report_content) if human_report_content else None
-        )
     except Exception as e:
+        print(f"CRITICAL ERROR in Background Task for Job {request.job_id}: {e}")
         # If job_id is provided, update Supabase with the failure
         if request.job_id and supabase:
             try:
@@ -209,5 +171,14 @@ def trigger_audit(request: AuditRequest):
                 }).eq("id", request.job_id).execute()
             except Exception as se:
                 print(f"Failed to update Supabase failure for job {request.job_id}: {se}")
-        
-        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/audit", response_model=AuditResponse)
+async def trigger_audit(request: AuditRequest, background_tasks: BackgroundTasks):
+    # Initiate the audit in the background and return immediately to prevent timeouts
+    background_tasks.add_task(run_audit_in_background, request)
+    
+    return AuditResponse(
+        status="processing",
+        dataset_url=request.dataset_url,
+        job_id=request.job_id
+    )
