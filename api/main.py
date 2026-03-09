@@ -170,7 +170,14 @@ def run_audit_in_background(request: AuditRequest):
             except Exception as e:
                 print(f"❌ Failed to update Supabase job {request.job_id}: {e}")
         else:
-            print(f"⏭️ Skipping Supabase update for Job {request.job_id} (Missing job_id or supabase client)")
+            reason = ""
+            if not request.job_id: reason += "Missing job_id. "
+            if not supabase: 
+                reason += "Supabase client is None. "
+                if not os.getenv("SUPABASE_URL"): reason += "(SUPABASE_URL missing from env) "
+                if not os.getenv("SUPABASE_SERVICE_ROLE_KEY"): reason += "(SUPABASE_SERVICE_ROLE_KEY missing from env) "
+            
+            print(f"⏭️ Skipping Supabase update for Job {request.job_id}: {reason}")
 
     except Exception as e:
         print(f"CRITICAL ERROR in Background Task for Job {request.job_id}: {e}")
