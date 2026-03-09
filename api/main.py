@@ -31,18 +31,28 @@ supabase: Client = None
 if SUPABASE_URL and SUPABASE_KEY:
     try:
         supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+        print("✅ Supabase client initialized successfully.")
     except Exception as e:
-        print(f"Failed to initialize Supabase: {e}")
+        print(f"❌ Failed to initialize Supabase: {e}")
+else:
+    print("⚠️ Supabase credentials missing from environment variables.")
 
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
 
 def run_audit_in_background(request: AuditRequest):
+    print(f"🚀 Starting background audit for Job ID: {request.job_id}")
+    if not request.job_id:
+        print("⚠️ Warning: No Job ID provided in request. Results will not be saved to Supabase.")
+    if not supabase:
+        print("⚠️ Warning: Supabase client is not initialized. Results will not be saved.")
+
     try:
         # Initialize and kickoff the crew
         crew = AuditorCrew(dataset_url=request.dataset_url)
         result = crew.run()
+        print(f"✅ Crew execution completed for Job {request.job_id}")
         
         raw_text = result.raw
         
@@ -150,14 +160,17 @@ def run_audit_in_background(request: AuditRequest):
         # Update Supabase with the final successful result
         if request.job_id and supabase:
             try:
-                supabase.table("jobs").update({
+                print(f"📤 Attempting to update Supabase for Job {request.job_id}...")
+                update_result = supabase.table("jobs").update({
                     "status": "completed",
                     "result": data,
                     "updated_at": "now()"
                 }).eq("id", request.job_id).execute()
-                print(f"Job {request.job_id} successfully updated in Supabase.")
+                print(f"🎉 Job {request.job_id} successfully updated in Supabase. Response: {update_result}")
             except Exception as e:
-                print(f"Failed to update Supabase job {request.job_id}: {e}")
+                print(f"❌ Failed to update Supabase job {request.job_id}: {e}")
+        else:
+            print(f"⏭️ Skipping Supabase update for Job {request.job_id} (Missing job_id or supabase client)")
 
     except Exception as e:
         print(f"CRITICAL ERROR in Background Task for Job {request.job_id}: {e}")
