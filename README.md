@@ -1,194 +1,114 @@
-# 🔍 Autonomous Dataset Auditor for ML Teams
+# 🔍 Autonomous Dataset Auditor: Full-Stack ML Governance Platform
 
-> A multi-agent AI system that autonomously audits datasets for machine learning readiness — detecting schema issues, bias, data leakage, quality problems, and more — then generates a production-ready preprocessing pipeline.
-
----
-
-## 🚀 Overview
-
-The **Autonomous Dataset Auditor** is a FastAPI-powered backend that orchestrates a **9-agent CrewAI pipeline** to perform a comprehensive audit of any CSV or Excel dataset. Simply provide a dataset URL, and the system returns a structured audit report covering every critical dimension of ML readiness.
+> An end-to-end, multi-agent AI system that autonomously audits datasets for machine learning readiness — detecting schema issues, bias, data leakage, and quality problems — then generates a production-ready preprocessing pipeline with a high-fidelity dashboard.
 
 ---
 
-## 🤖 Agent Pipeline
+## 🏗️ Architecture Overview
 
-The system runs **9 specialized AI agents** sequentially, each responsible for a distinct audit dimension:
+The system is split into a **9-agent CrewAI Swarm** (Backend) and a **Premium React Dashboard** (Frontend), synchronized via **Supabase**.
+
+```mermaid
+graph TD
+    A[User / Frontend] -->|Trigger Audit| B[FastAPI Backend]
+    B -->|Initialization| C[Supabase DB / Storage]
+    B -->|Background Task| D{CrewAI Swarm}
+    D -->|Step 1-9| E[Specialized AI Agents]
+    E -->|Final JSON| C
+    C -->|Real-time Update| A
+    E -->|Python Code| A
+```
+
+---
+
+## 🤖 The "Neural Swarm" (Backend)
+
+The backend orchestrates **9 specialized AI agents** sequentially. Each agent is responsible for a distinct dimension of dataset health:
 
 | # | Agent | Responsibility |
 |---|-------|---------------|
-| 1 | **Schema Auditor** | Infers dataset domain, column types, missing values, and column roles (feature / target / identifier) |
-| 2 | **Bias & Fairness Auditor** | Detects class imbalance, sensitive attributes, and demographic representation risks |
-| 3 | **Leakage Detection Specialist** | Identifies direct, proxy, temporal, and ID-based target leakage risks |
-| 4 | **Data Quality Auditor** | Finds duplicates, outliers, skewed distributions, invalid values, and constant columns |
-| 5 | **Feature Readiness Analyst** | Evaluates feature suitability — redundancy, high cardinality, correlation, encoding/scaling needs |
-| 6 | **Preprocessing Strategist** | Designs a complete preprocessing plan based on all prior findings |
-| 7 | **Model Compatibility Advisor** | Recommends suitable ML algorithms based on dataset characteristics |
-| 8 | **Pipeline Code Generator** | Generates a complete, executable Python preprocessing pipeline using pandas & scikit-learn |
-| 9 | **Audit Report Generator** | Consolidates all findings into a structured JSON report conforming to the Pydantic schema |
+| 1 | **Schema Auditor** | Infers domain, column types, missing values, and identifies target variables. |
+| 2 | **Bias & Fairness Auditor** | Detects demographic risks, class imbalance, and representation gaps. |
+| 3 | **Leakage Detection** | Identifies temporal, proxy, and ID-based target leakage risks. |
+| 4 | **Data Quality Auditor** | Finds duplicates, outliers, skewness, and invalid values. |
+| 5 | **Feature Readiness** | Evaluates redundancy, encoding needs, and scaling requirements. |
+| 6 | **Preprocessing Strategist** | Designs an optimal transformation plan based on prior findings. |
+| 7 | **Model Compatibility** | Recommends specific algorithms tailored to the dataset signature. |
+| 8 | **Code Generator** | Produces a complete, executable Python script using `scikit-learn`. |
+| 9 | **Report Generator** | Consolidates all intelligence into a structured Pydantic JSON & Markdown report. |
 
 ---
 
-## 🛠️ Tech Stack
+## 🎨 Premium Dashboard (Frontend)
 
-- **[FastAPI](https://fastapi.tiangolo.com/)** — REST API framework
-- **[CrewAI](https://www.crewai.com/)** — Multi-agent orchestration (sequential pipeline)
-- **[OpenAI GPT-4o-mini](https://platform.openai.com/)** — LLM backbone for all agents
-- **[Pydantic](https://docs.pydantic.dev/)** — Request/response schema validation
-- **[Docker](https://www.docker.com/)** — Containerized deployment
-- **[GitHub Actions](https://github.com/features/actions)** — CI/CD pipeline
+The frontend is a high-performance **Vite + React** application designed for speed and clarity.
 
----
-
-## 📁 Project Structure
-
-```
-Autonomous Dataset Auditor/
-├── api/
-│   ├── main.py          # FastAPI app, /health and /api/audit endpoints
-│   └── models.py        # Pydantic schemas: AuditRequest, AuditResponse, DatasetSummary
-├── agents/
-│   ├── agents.py        # 9 CrewAI agent definitions
-│   ├── tasks.py         # 9 task definitions with prompts and expected outputs
-│   └── crew.py          # AuditorCrew: assembles and runs the sequential pipeline
-├── .github/
-│   └── workflows/       # GitHub Actions CI pipeline
-├── Dockerfile           # Docker build config (Python 3.11, uvicorn on port 8000)
-├── requirements.txt     # Python dependencies
-└── .env                 # API keys (not committed)
-```
+- **Neural Synthesis UI**: Real-time status tracking for running audits.
+- **Actionable Intelligence**: Immediate, high-level recommendations from the AI.
+- **Detailed Audit Tabs**: Dedicated views for Schema, Bias, Leakage, and Quality Risks.
+- **Executable Script Export**: One-click copy for the generated prepocessing code.
+- **Aesthetic**: Modern dark-mode UI powered by **Tailwind CSS**, **Framer Motion**, and **Radix UI**.
 
 ---
 
-## 📦 API Reference
+## 🛠️ Technical Stack
 
-### `GET /health`
-Returns service health status.
+### **Backend (Python)**
+- **FastAPI**: REST orchestration and background task management.
+- **CrewAI**: Multi-agent framework for sequential task execution.
+- **OpenAI GPT-4o-mini**: The LLM engine powering the swarm.
 
-**Response:**
-```json
-{"status": "ok"}
-```
+### **Frontend (React)**
+- **Vite**: Ultra-fast build tool and development server.
+- **Supabase**: Real-time database for job tracking and dataset storage.
+- **Lucide React**: Premium icon set for technical visualization.
 
----
-
-### `POST /api/audit`
-Triggers the full 9-agent dataset audit pipeline.
-
-**Request Body:**
-```json
-{
-  "dataset_url": "https://example.com/dataset.csv",
-  "target_column": "target"
-}
-```
-
-**Response (`AuditResponse`):**
-```json
-{
-  "status": "completed",
-  "dataset_url": "...",
-  "summary": {
-    "dataset_name": "...",
-    "rows": 1000,
-    "columns": 15,
-    "domain": "finance",
-    "ml_readiness": "medium",
-    "bias_risk": "high",
-    "leakage_risk": "low",
-    "data_quality_risk": "medium",
-    "feature_readiness_risk": "low",
-    "preprocessing_plan_risk": "low",
-    "model_compatibility_risk": "low",
-    "pipeline_code_risk": "low"
-  },
-  "schema_analysis": { ... },
-  "bias_analysis": { ... },
-  "leakage_analysis": { ... },
-  "data_quality_analysis": { ... },
-  "feature_readiness_analysis": { ... },
-  "preprocessing_plan": { ... },
-  "model_compatibility_analysis": { ... },
-  "recommendations": ["...", "..."],
-  "pipeline_code": "import pandas as pd\n...",
-  "human_report": "# Dataset Audit Report\n..."
-}
-```
+### **DevOps & Cloud**
+- **Docker**: Containerized deployment for consistent environments.
+- **GitHub Actions**: Automated CI/CD (Build -> Push -> Deploy to Azure).
+- **Azure Container Apps**: Scalable serverless hosting.
 
 ---
 
 ## ⚙️ Getting Started
 
-### Prerequisites
+### 1. Backend Configuration (`/`)
+1. Create a `.env` file in the root:
+   ```env
+   OPENAI_API_KEY=your_key
+   SUPABASE_URL=your_url
+   SUPABASE_SERVICE_ROLE_KEY=your_service_key
+   ```
+2. Run with Docker:
+   ```bash
+   docker build -t dataset-auditor .
+   docker run -p 8000:8000 --env-file .env dataset-auditor
+   ```
 
-- Python 3.11+
-- Docker & Docker Compose
-- An OpenAI API key
-
-### 1. Configure Environment Variables
-
-Create a `.env` file in the project root:
-
-```env
-OPENAI_API_KEY=your_openai_api_key_here
-```
-
-### 2. Run with Docker
-
-```bash
-docker build -t dataset-auditor .
-docker run -p 8000:8000 -e OPENAI_API_KEY=your_key_here dataset-auditor
-```
-
-### 3. Run Locally (without Docker)
-
-```bash
-# Create and activate virtual environment
-python -m venv venv
-venv\Scripts\activate       # Windows
-source venv/bin/activate    # macOS/Linux
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Start the server
-uvicorn api.main:app --reload
-```
-
-### 4. Access the API
-
-- **Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)
-- **ReDoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
+### 2. Frontend Configuration (`/frontend-agent`)
+1. Create `.env` in the frontend directory:
+   ```env
+   VITE_SUPABASE_URL=your_url
+   VITE_SUPABASE_ANON_KEY=your_key
+   VITE_API_URL=http://localhost:8000
+   ```
+2. Install and launch:
+   ```bash
+   npm install
+   npm run dev
+   ```
 
 ---
 
-## 🧪 Example Usage
+## 🔄 CI/CD Pipeline
 
-```bash
-curl -X POST http://localhost:8000/api/audit \
-  -H "Content-Type: application/json" \
-  -d '{"dataset_url": "https://raw.githubusercontent.com/datasciencedojo/datasets/master/titanic.csv", "target_column": "Survived"}'
-```
-
----
-
-## 📋 Dependencies
-
-```
-fastapi
-uvicorn
-pydantic
-crewai[tools]
-crewai[anthropic]
-```
-
----
-
-## 🔄 CI/CD
-
-A GitHub Actions workflow is included under `.github/workflows/` for automated linting on every push and pull request.
+The project includes a robust **GitHub Actions** workflow (`.github/workflows/ci.yml`) that:
+1. **Lints** the backend for code quality.
+2. **Builds** a Docker image on every push to `main`.
+3. **Pushes** the image to **Azure Container Registry (ACR)**.
+4. **Deploys** directly to **Azure Container Apps**.
 
 ---
 
 ## 📄 License
-
-This project is open-source. Feel free to use and extend it for your ML team's dataset auditing needs.
+Open-source under the MIT License. Feel free to contribute or adapt for your ML teams!
